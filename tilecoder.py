@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import division, print_function
 import numpy as np
 from math import pi, sqrt, exp
 
@@ -17,7 +17,7 @@ class Tilecoder:
         self._outputs = num_outputs
         self._num_tilings = num_tilings
 
-        self._weights = init([num_tilings] + [d+1 for d in input_densities])
+        self._weights = init([num_tilings] + [d+1 for d in input_densities] + [num_outputs])
 
     def _index_f(self, X):
         return [range(self._num_tilings)] + \
@@ -26,8 +26,8 @@ class Tilecoder:
                         self._lower[i]-t*self._offsets[i],
                         self._upper[i]-t*self._offsets[i],
                         0, self._densities[i]))
-                for t in xrange(self._num_tilings)]
-            for i in xrange(self._inputs)]
+                for t in range(self._num_tilings)]
+            for i in range(self._inputs)]
 
     def __getitem__(self, index):
         return sum(self._weights[self._index_f(index)])
@@ -51,40 +51,37 @@ def rescale(X, lo, hi, new_lo, new_hi):
 
 def example():
     from pylab import sin, cos, normal, random
-#   def targetFunction(in1,in2):
-#       return sin(in1)+cos(in2) + normal(0,0.1)
-#    def targetFunction(in1):
-#        return sin(in1) + normal(0,0.1)
     def targetFunction(*X):
-#        return sum(c*c for c in X)
-#        return 5. + normal(0, 0.1)
-        x,y = X
-        sigma = 1.
-        mu = 0.
-        return 5. * exp(-x*x-y*y) + normal(0., 0.1) + 5.
+        return sin(X[0])*cos(X[1]) + normal(0., 0.1)
+#        return X[0] + X[1] - 2*X[0]*X[1] + normal(0., 0.1)
 
-#    bounds = [(0., 2.*pi), (0., 2.*pi)]
-    bounds = [(-3, 3)] * 2
+    bounds = [(0, 2*pi)] * 2
     dimensions = [8] * len(bounds)
     num_tilings = 10
 
     T = Tilecoder(bounds, dimensions, num_tilings, 1)
+    consecutive = 0
 
     try:
-        for n in xrange(1000):
+        batch_size = 100
+        for n in range(1000):
             mean_sq_err = 0.0
-            for i in xrange(100):
+            for i in range(batch_size):
                 X = [0] * len(bounds)
-                for j in xrange(len(bounds)):
+                for j in range(len(bounds)):
                     X[j] = rescale(random(), 0, 1, *bounds[j])
                 Z = targetFunction(*X)
-                err = (T[X] - Z) ** 2
-                T[X] += (Z - T[X]) * 0.001
+                err = np.linalg.norm(T[X] - Z) ** 2
+                T[X] += (Z - T[X]) * 0.05
                 mean_sq_err += (err - mean_sq_err) / (i+1)
-            print "MSE = {}".format(mean_sq_err)
-            if mean_sq_err < .01:
-                print "Converged after {} iterations".format(n*30)
-                raise KeyboardInterrupt
+            print("MSE = {}".format(mean_sq_err))
+            if mean_sq_err < 0.01 * 1.05:
+                consecutive += 1
+                if consecutive >= 20:
+                    print("Converged after {} iterations".format(n*batch_size))
+                    raise KeyboardInterrupt
+            else:
+                consecutive = 0
     except KeyboardInterrupt:
         pass
 
@@ -93,7 +90,7 @@ def example():
     nY = 200
     bwidth = [(x2-x1) for (x1,x2) in bounds]
     if len(bounds) == 1:
-        X = [bwidth[0]*i/nX+bounds[0][0] for i in xrange(nX)]
+        X = [bwidth[0]*i/nX+bounds[0][0] for i in range(nX)]
         Z = np.zeros((nX,))
         for i,x in enumerate(X):
             Z[i] = T[(x,)]
@@ -104,8 +101,8 @@ def example():
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        X = [bwidth[0]*i/nX+bounds[0][0] for i in xrange(nX)]
-        Y = [bwidth[1]*i/nY+bounds[1][0] for i in xrange(nY)]
+        X = [bwidth[0]*i/nX+bounds[0][0] for i in range(nX)]
+        Y = [bwidth[1]*i/nY+bounds[1][0] for i in range(nY)]
 
         Z = np.zeros((nX, nY))
         for i,x in enumerate(X):
