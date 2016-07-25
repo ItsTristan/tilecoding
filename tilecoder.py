@@ -17,7 +17,7 @@ class Tilecoder:
         self._outputs = num_outputs
         self._num_tilings = num_tilings
 
-        self._weights = init([num_tilings] + [d+1 for d in input_densities])
+        self._weights = init([num_tilings] + [d+1 for d in input_densities] + [num_outputs])
 
     def _index_f(self, X):
         return [range(self._num_tilings)] + \
@@ -51,40 +51,39 @@ def rescale(X, lo, hi, new_lo, new_hi):
 
 def example():
     from pylab import sin, cos, normal, random
-#   def targetFunction(in1,in2):
-#       return sin(in1)+cos(in2) + normal(0,0.1)
-#    def targetFunction(in1):
-#        return sin(in1) + normal(0,0.1)
     def targetFunction(*X):
-#        return sum(c*c for c in X)
-#        return 5. + normal(0, 0.1)
-        x,y = X
-        sigma = 1.
-        mu = 0.
-        return 5. * exp(-x*x-y*y) + normal(0., 0.1) + 5.
+        return sin(X[0]) + cos(X[1]) + normal(0., 0.1)
 
-#    bounds = [(0., 2.*pi), (0., 2.*pi)]
-    bounds = [(-3, 3)] * 2
+    bounds = [(0, 2*pi)] * 2
     dimensions = [8] * len(bounds)
     num_tilings = 10
 
     T = Tilecoder(bounds, dimensions, num_tilings, 1)
 
     try:
+        batch_size = 50
+        twice = False
         for n in xrange(1000):
             mean_sq_err = 0.0
-            for i in xrange(100):
+            for i in xrange(batch_size):
                 X = [0] * len(bounds)
                 for j in xrange(len(bounds)):
                     X[j] = rescale(random(), 0, 1, *bounds[j])
                 Z = targetFunction(*X)
-                err = (T[X] - Z) ** 2
-                T[X] += (Z - T[X]) * 0.001
+                err = np.linalg.norm(T[X] - Z) ** 2
+                T[X] += (Z - T[X]) * 0.05
                 mean_sq_err += (err - mean_sq_err) / (i+1)
             print "MSE = {}".format(mean_sq_err)
-            if mean_sq_err < .01:
-                print "Converged after {} iterations".format(n*30)
-                raise KeyboardInterrupt
+            # Stop if MSE is less than 5% away from target error
+            # Require two consecutive batches to count as converged
+            if mean_sq_err < .01 * 1.05: # At most 5% of the target MSE
+                if twice:
+                    print "Converged after {} iterations".format(n*batch_size)
+                    raise KeyboardInterrupt
+                else:
+                    twice = True
+            else:
+                twice = False
     except KeyboardInterrupt:
         pass
 
