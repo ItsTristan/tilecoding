@@ -63,7 +63,8 @@ def example():
     consecutive = 0
 
     try:
-        batch_size = 100
+        batch_size = 50
+        twice = False
         for n in range(1000):
             mean_sq_err = 0.0
             for i in range(batch_size):
@@ -75,13 +76,16 @@ def example():
                 T[X] += (Z - T[X]) * 0.05
                 mean_sq_err += (err - mean_sq_err) / (i+1)
             print("MSE = {}".format(mean_sq_err))
-            if mean_sq_err < 0.01 * 1.05:
-                consecutive += 1
-                if consecutive >= 20:
+            # Stop if MSE is less than 5% away from target error
+            # Require two consecutive batches to count as converged
+            if mean_sq_err < .01 * 1.05: # At most 5% of the target MSE
+                if twice:
                     print("Converged after {} iterations".format(n*batch_size))
                     raise KeyboardInterrupt
+                else:
+                    twice = True
             else:
-                consecutive = 0
+                twice = False
     except KeyboardInterrupt:
         pass
 
